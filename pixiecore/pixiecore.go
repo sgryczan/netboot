@@ -250,6 +250,13 @@ func (s *Server) Serve() error {
 	s.errs = make(chan error, 6)
 
 	s.debug("Init", "Starting Pixiecore goroutines")
+	s.debug("Init", "Running callback mode")
+	err = ReflectStructField(s.Booter, "urlPrefix")
+	if err != nil {
+		s.debug("Init", "No urlPrefix")
+	} else {
+		s.debug("Init", "found urlPrefix")
+	}
 
 	go func() { s.errs <- s.serveDHCP(dhcp) }()
 	go func() { s.errs <- s.servePXE(pxe) }()

@@ -16,12 +16,15 @@ package pixiecore
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net"
 	"net/http"
 	"net/url"
+	"reflect"
 	"strconv"
 	"text/template"
 	"time"
@@ -116,6 +119,73 @@ func (s *Server) handleIpxe(w http.ResponseWriter, r *http.Request) {
 	w.Write(script)
 	s.debug("HTTP", "Writing ipxe script to %s took %s", mac, time.Since(start))
 	s.debug("HTTP", "handleIpxe for %s took %s", mac, time.Since(overallStart))
+
+	// Here is where we want to add another function to send a POST
+	// to the API being used, so we can have a history of which machines
+	// have been booted.
+
+	// are we running in API Mode?
+	s.debug("HTTP", "Checking for API Booter")
+	s.debug("HTTP", "%+v", s.Booter)
+	err = ReflectStructField(s.Booter, "urlPrefix")
+	if err == nil {
+		s.debug("HTTP", "Looks like urlPrefix exists, updating inventory")
+
+		res, err := s.updateInventory(&mach)
+		if err != nil {
+			s.debug("HTTP", "Error updating inventory: %v", err)
+			return
+		}
+		s.debug("HTTP", "%s", res)
+	} else {
+		s.debug("HTTP", "No urlPrefix in Booter, skipping inventory: %+v", s.Booter)
+	}
+}
+
+func (s *Server) updateInventory(m *Machine) ([]byte, error) {
+	url := "http://localhost:8080/history"
+	httpClient := http.Client{}
+	mach := struct {
+		MacAddr string
+		Arch    string
+	}{
+		MacAddr: m.MAC.String(),
+		Arch:    m.Arch.String(),
+	}
+
+	body, err := json.Marshal(mach)
+	if err != nil {
+		s.log("HTTP", "Error marshalling machine: %v", err)
+	}
+	s.debug("INVENTORY", "Sending machine: %s", body)
+
+	req, _ := http.NewRequest("POST", url, bytes.NewBuffer(body))
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+
+	body, _ = ioutil.ReadAll(resp.Body)
+	return body, err
+}
+
+// ReflectStructField determines if an interface is a struct/*struct
+// and has a given field defined
+func ReflectStructField(Iface interface{}, FieldName string) error {
+	ValueIface := reflect.ValueOf(Iface)
+
+	// Check if the passed interface is a pointer
+	if ValueIface.Type().Kind() != reflect.Ptr {
+		// Create a new type of Iface's Type, so we have a pointer to work with
+		ValueIface = reflect.New(reflect.TypeOf(Iface))
+	}
+
+	// 'dereference' with Elem() and get the field by name
+	Field := ValueIface.Elem().FieldByName(FieldName)
+	if !Field.IsValid() {
+		return fmt.Errorf("Interface `%s` does not have the field `%s`", ValueIface.Type(), FieldName)
+	}
+	return nil
 }
 
 func (s *Server) handleFile(w http.ResponseWriter, r *http.Request) {
