@@ -120,16 +120,12 @@ func (s *Server) handleIpxe(w http.ResponseWriter, r *http.Request) {
 	s.debug("HTTP", "Writing ipxe script to %s took %s", mac, time.Since(start))
 	s.debug("HTTP", "handleIpxe for %s took %s", mac, time.Since(overallStart))
 
-	// Here is where we want to add another function to send a POST
-	// to the API being used, so we can have a history of which machines
-	// have been booted.
-
 	// are we running in API Mode?
 	s.debug("HTTP", "Checking for API Booter")
 	s.debug("HTTP", "%+v", s.Booter)
-	err = ReflectStructField(s.Booter, "urlPrefix")
+	err = ReflectStructField(s.Booter, "client")
 	if err == nil {
-		s.debug("HTTP", "Looks like urlPrefix exists, updating inventory")
+		s.debug("HTTP", "Updating inventory")
 
 		res, err := s.updateInventory(&mach)
 		if err != nil {
@@ -138,12 +134,12 @@ func (s *Server) handleIpxe(w http.ResponseWriter, r *http.Request) {
 		}
 		s.debug("HTTP", "%s", res)
 	} else {
-		s.debug("HTTP", "No urlPrefix in Booter, skipping inventory: %+v", s.Booter)
+		s.debug("HTTP", "No HTTP client in Booter, skipping inventory (are we running in static mode?): %+v", s.Booter)
 	}
 }
 
 func (s *Server) updateInventory(m *Machine) ([]byte, error) {
-	url := "http://localhost:8080/history"
+	url := reflect.ValueOf(s.Booter).Elem().FieldByName("urlPrefix").String() + "/inventory"
 	httpClient := http.Client{}
 	mach := struct {
 		MacAddr string
