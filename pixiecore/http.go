@@ -142,12 +142,19 @@ func (s *Server) updateInventory(m *Machine) ([]byte, error) {
 	url := reflect.ValueOf(s.Booter).Elem().FieldByName("urlPrefix").String() + "/inventory"
 	httpClient := http.Client{}
 	mach := struct {
-		MacAddr string
-		Arch    string
+		Type    string
+		Date    string
+		Details struct {
+			MacAddr string
+			Arch    string
+		}
 	}{
-		MacAddr: m.MAC.String(),
-		Arch:    m.Arch.String(),
+		Type: "iPXE",
+		Date: time.Now().String(),
 	}
+
+	mach.Details.Arch = m.Arch.String()
+	mach.Details.MacAddr = m.MAC.String()
 
 	body, err := json.Marshal(mach)
 	if err != nil {
