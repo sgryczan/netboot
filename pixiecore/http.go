@@ -143,16 +143,13 @@ func (s *Server) updateInventory(m *Machine) ([]byte, error) {
 	httpClient := http.Client{}
 	mach := struct {
 		Type    string
-		Date    string
 		Details struct {
 			MacAddr string
 			Arch    string
 		}
-	}{
-		Type: "iPXE",
-		Date: time.Now().String(),
-	}
+	}{}
 
+	mach.Type = "iPXE"
 	mach.Details.Arch = m.Arch.String()
 	mach.Details.MacAddr = m.MAC.String()
 
